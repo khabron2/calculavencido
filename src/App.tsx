@@ -47,7 +47,6 @@ export default function App() {
   const [products, setProducts] = useState<Product[]>([]);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [textSize, setTextSize] = useState<TextSizePref>('normal');
-  const [showWelcomeTip, setShowWelcomeTip] = useState(true);
 
   // We set our base reference date based on system clock metadata (May 28, 2026)
   const [currentSystemDate] = useState(() => new Date('2026-05-28T13:30:32Z'));
@@ -90,6 +89,15 @@ export default function App() {
       localStorage.removeItem('control_vencimientos_prods');
     }
   }, [products]);
+
+  // Sync standard HTML document classes with Dark Mode
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
 
   const handleToggleDarkMode = () => {
     const nextDark = !isDarkMode;
@@ -249,34 +257,6 @@ export default function App() {
         {/* CONTAINER FOR CONTENT */}
         <main className="max-w-3xl mx-auto px-4 py-5 space-y-6">
           
-          {/* USER WELCOME ADVISORY */}
-          {showWelcomeTip && (
-            <div id="tip-educational-alert" className="bg-gradient-to-r from-zinc-50 to-zinc-100/80 dark:from-zinc-900 dark:to-zinc-900/40 border-2 border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 shadow-sm relative transition-all">
-              <button
-                type="button"
-                id="btn-close-tip"
-                onClick={() => setShowWelcomeTip(false)}
-                className="absolute top-3.5 right-3.5 w-8 h-8 rounded-full bg-zinc-200/50 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 flex items-center justify-center font-bold text-sm cursor-pointer"
-                aria-label="Cerrar aviso"
-              >
-                ✕
-              </button>
-              <div className="flex gap-4 items-start">
-                <div className="p-3 bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 rounded-2xl shrink-0">
-                  <Smartphone className="w-7 h-7" />
-                </div>
-                <div className="pr-6">
-                  <h3 className={`font-black text-zinc-805 dark:text-zinc-200 ${textSizeClass(1.05)}`}>
-                    👵👴 Diseñado para Alta Claridad & Adultos Mayores
-                  </h3>
-                  <p className={`text-zinc-600 dark:text-zinc-400 mt-1 leading-relaxed ${textSizeClass(0.85)}`}>
-                    Esta aplicación está configurada con botones extragrandes, altos contrastes y tipografías grandes para un control cómodo y ágil. Si deseas aumentar todavía más el tamaño de las letras, pulsa el botón <strong className="text-emerald-600 dark:text-emerald-400 select-none">A++</strong> arriba.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* DUAL FLASHLIGHT COMPONENT */}
           <FlashlightController textSizeClass={textSizeClass} />
 

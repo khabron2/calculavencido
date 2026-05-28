@@ -17,7 +17,7 @@ export default function ProductForm({ onAddProduct, textSizeClass }: ProductForm
     const d = String(today.getDate()).padStart(2, '0');
     return `${y}-${m}-${d}`;
   });
-  const [durationValue, setDurationValue] = useState<number>(30);
+  const [durationValue, setDurationValue] = useState<number | ''>(30);
   const [durationType, setDurationType] = useState<DurationType>('days');
 
   // Live calculation states
@@ -26,7 +26,8 @@ export default function ProductForm({ onAddProduct, textSizeClass }: ProductForm
 
   // Auto calculate expiration whenever values change
   useEffect(() => {
-    const calculated = calculateExpiration(fabricationDate, durationValue, durationType);
+    const numericValue = durationValue === '' ? 1 : durationValue;
+    const calculated = calculateExpiration(fabricationDate, numericValue, durationType);
     setLiveExpirationDate(calculated);
     if (calculated) {
       setDaysDifference(getDaysDiff(calculated));
@@ -44,11 +45,23 @@ export default function ProductForm({ onAddProduct, textSizeClass }: ProductForm
   };
 
   const handleIncrement = () => {
-    setDurationValue(prev => Math.max(1, prev + 1));
+    setDurationValue(prev => {
+      const num = prev === '' ? 0 : prev;
+      return Math.max(1, num + 1);
+    });
   };
 
   const handleDecrement = () => {
-    setDurationValue(prev => Math.max(1, prev - 1));
+    setDurationValue(prev => {
+      const num = prev === '' ? 2 : prev;
+      return Math.max(1, num - 1);
+    });
+  };
+
+  const handleBlur = () => {
+    if (durationValue === '' || durationValue < 1) {
+      setDurationValue(1);
+    }
   };
 
   const resetForm = () => {
@@ -63,10 +76,12 @@ export default function ProductForm({ onAddProduct, textSizeClass }: ProductForm
     if (!name.trim()) return;
     if (!liveExpirationDate) return;
 
+    const finalDurationValue = durationValue === '' ? 1 : durationValue;
+
     onAddProduct({
       name: name.trim(),
       fabricationDate,
-      durationValue,
+      durationValue: finalDurationValue,
       durationType,
       expirationDate: liveExpirationDate,
     });
@@ -153,7 +168,7 @@ export default function ProductForm({ onAddProduct, textSizeClass }: ProductForm
         </label>
 
         {/* Big tactile step indicators for volume control */}
-        <div className="flex items-center gap-4 bg-zinc-50 dark:bg-zinc-800/60 border-2 border-zinc-200 dark:border-zinc-700 rounded-2xl p-2.5">
+        <div className="flex items-center justify-between bg-zinc-50 dark:bg-zinc-800/60 border-2 border-zinc-200 dark:border-zinc-700 rounded-2xl p-2.5">
           <button
             type="button"
             id="btn-duration-minus"
@@ -169,8 +184,19 @@ export default function ProductForm({ onAddProduct, textSizeClass }: ProductForm
             id="num-duration-value"
             min="1"
             value={durationValue}
-            onChange={(e) => setDurationValue(Math.max(1, parseInt(e.target.value, 10) || 1))}
-            className={`flex-1 text-center bg-transparent border-0 text-zinc-900 dark:text-white focus:outline-none font-bold tracking-tight focus:ring-0 select-all ${textSizeClass(1.5)}`}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === '') {
+                setDurationValue('');
+              } else {
+                const parsed = parseInt(val, 10);
+                if (!isNaN(parsed)) {
+                  setDurationValue(parsed);
+                }
+              }
+            }}
+            onBlur={handleBlur}
+            className={`w-24 md:w-32 min-w-0 text-center bg-transparent border-0 text-zinc-900 dark:text-white focus:outline-none font-bold tracking-tight focus:ring-0 select-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${textSizeClass(1.5)}`}
           />
 
           <button

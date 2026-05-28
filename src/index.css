@@ -8,16 +8,27 @@
 body {
   margin: 0;
   font-family: var(--font-sans);
-  background-color: #09090b; /* bg-zinc-950 default */
+  background-color: #f4f4f5; /* zinc-100 default for light mode */
+  color: #09090b;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
   min-height: -webkit-fill-available;
+  overflow-x: hidden;
+  width: 100%;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+html.dark body {
+  background-color: #09090b; /* zinc-950 default for dark mode */
+  color: #f4f4f5;
 }
 
 /* Mobile notch and navigation bar integrations */
 html {
   height: -webkit-fill-available;
+  overflow-x: hidden;
+  width: 100%;
 }
 
 #app-nav-header {
