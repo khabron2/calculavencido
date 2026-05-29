@@ -1,311 +1,221 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import React, { useState, useEffect } from 'react';
-import { Calendar, Plus, Minus, RotateCcw, Save, Sparkles, CheckCircle2, AlertTriangle } from 'lucide-react';
-import { DurationType, Product } from '../types';
-import { calculateExpiration, getDaysDiff, formatFriendlyDate } from '../utils/dateHelpers';
+import { Product } from '../types';
+import { Tag, Barcode, DollarSign, Package, Folder, Plus, Save, X, Loader2 } from 'lucide-react';
 
 interface ProductFormProps {
-  onAddProduct: (product: Omit<Product, 'id' | 'createdAt'>) => void;
-  textSizeClass: (factor: number) => string;
+  initialBarcode?: string; // If prefilled on a scan that matched nothing
+  editingProduct?: Product | null; // If editing an existing one
+  onSave: (product: Omit<Product, 'rowNumber'> & { rowNumber?: number }) => Promise<void>;
+  onCancel: () => void;
 }
 
-export default function ProductForm({ onAddProduct, textSizeClass }: ProductFormProps) {
+export default function ProductForm({ initialBarcode = '', editingProduct = null, onSave, onCancel }: ProductFormProps) {
+  const [barcode, setBarcode] = useState(initialBarcode);
   const [name, setName] = useState('');
-  const [fabricationDate, setFabricationDate] = useState(() => {
-    const today = new Date();
-    const y = today.getFullYear();
-    const m = String(today.getMonth() + 1).padStart(2, '0');
-    const d = String(today.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  });
-  const [durationValue, setDurationValue] = useState<number | ''>(30);
-  const [durationType, setDurationType] = useState<DurationType>('days');
+  const [price, setPrice] = useState('');
+  const [category, setCategory] = useState('');
+  const [stock, setStock] = useState('0');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Live calculation states
-  const [liveExpirationDate, setLiveExpirationDate] = useState('');
-  const [daysDifference, setDaysDifference] = useState<number>(0);
-
-  // Auto calculate expiration whenever values change
   useEffect(() => {
-    const numericValue = durationValue === '' ? 1 : durationValue;
-    const calculated = calculateExpiration(fabricationDate, numericValue, durationType);
-    setLiveExpirationDate(calculated);
-    if (calculated) {
-      setDaysDifference(getDaysDiff(calculated));
-    } else {
-      setDaysDifference(0);
+    if (editingProduct) {
+      setBarcode(editingProduct.barcode);
+      setName(editingProduct.name);
+      setPrice(editingProduct.price.toString());
+      setCategory(editingProduct.category);
+      setStock(editingProduct.stock.toString());
+    } else if (initialBarcode) {
+      setBarcode(initialBarcode);
     }
-  }, [fabricationDate, durationValue, durationType]);
+  }, [editingProduct, initialBarcode]);
 
-  const setTodayDate = () => {
-    const today = new Date();
-    const y = today.getFullYear();
-    const m = String(today.getMonth() + 1).padStart(2, '0');
-    const d = String(today.getDate()).padStart(2, '0');
-    setFabricationDate(`${y}-${m}-${d}`);
-  };
-
-  const handleIncrement = () => {
-    setDurationValue(prev => {
-      const num = prev === '' ? 0 : prev;
-      return Math.max(1, num + 1);
-    });
-  };
-
-  const handleDecrement = () => {
-    setDurationValue(prev => {
-      const num = prev === '' ? 2 : prev;
-      return Math.max(1, num - 1);
-    });
-  };
-
-  const handleBlur = () => {
-    if (durationValue === '' || durationValue < 1) {
-      setDurationValue(1);
-    }
-  };
-
-  const resetForm = () => {
-    setName('');
-    setTodayDate();
-    setDurationValue(30);
-    setDurationType('days');
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
-    if (!liveExpirationDate) return;
+    setError(null);
 
-    const finalDurationValue = durationValue === '' ? 1 : durationValue;
+    if (!barcode.trim()) {
+      setError('El código de barras es obligatorio.');
+      return;
+    }
+    if (!name.trim()) {
+      setError('El nombre del producto es obligatorio.');
+      return;
+    }
 
-    onAddProduct({
-      name: name.trim(),
-      fabricationDate,
-      durationValue: finalDurationValue,
-      durationType,
-      expirationDate: liveExpirationDate,
-    });
+    const priceNum = parseFloat(price);
+    if (isNaN(priceNum) || priceNum < 0) {
+      setError('El precio debe ser un número válido mayor o igual a 0.');
+      return;
+    }
 
-    // Reset only the name for quick sequential entries
-    setName('');
+    const stockNum = parseInt(stock, 10);
+    if (isNaN(stockNum) || stockNum < 0) {
+      setError('El stock debe ser un número entero mayor o igual a 0.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await onSave({
+        barcode: barcode.trim(),
+        name: name.trim(),
+        price: priceNum,
+        category: category.trim() || 'Varios',
+        stock: stockNum,
+        rowNumber: editingProduct?.rowNumber, // Pass row index if it's an edit
+      });
+    } catch (e: any) {
+      setError(e.message || 'Error al guardar el producto.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
-
-  const isExpired = daysDifference < 0;
-  const isToday = daysDifference === 0;
 
   return (
-    <form
-      id="frm-vencimiento-input"
-      onSubmit={handleSubmit}
-      className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 md:p-6 shadow-md transition-all space-y-5"
-    >
-      <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
-        <h2 id="lbl-form-title" className={`font-black text-zinc-800 dark:text-zinc-100 flex items-center gap-2 ${textSizeClass(1.22)}`}>
-          <Sparkles className="w-6 h-6 text-emerald-500 shrink-0" />
-          <span className="uppercase tracking-tight">Nuevo Control</span>
-        </h2>
-        <button
-          type="button"
-          id="btn-rorm-reset"
-          onClick={resetForm}
-          className="p-2 text-zinc-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
-          title="Limpiar campos"
-        >
-          <RotateCcw className="w-5 h-5" />
-          <span id="txt-form-reset-lbl" className="text-xs font-bold font-mono">LIMPIAR</span>
-        </button>
+    <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 shadow-xl relative">
+      <button
+        onClick={onCancel}
+        className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
+      >
+        <X size={18} />
+      </button>
+
+      <div className="mb-6 text-left">
+        <h3 className="text-lg font-bold text-slate-800 tracking-tight">
+          {editingProduct ? 'Editar Producto' : 'Registrar Nuevo Producto'}
+        </h3>
+        <p className="text-xs text-slate-500 mt-1">
+          {editingProduct
+            ? 'Actualiza los detalles del producto en la hoja de Google Sheets.'
+            : 'Este producto no existe en tu base de datos. Complétalo para registrarlo en Google Sheets.'}
+        </p>
       </div>
 
-      {/* Product Name */}
-      <div className="space-y-2">
-        <label id="lbl-name-input-tag" htmlFor="txt-product-name" className={`block font-extrabold text-zinc-650 dark:text-zinc-405 uppercase tracking-wide text-xs ${textSizeClass(0.85)}`}>
-          Nombre del Producto
-        </label>
-        <div className="relative">
-          <input
-            type="text"
-            id="txt-product-name"
-            placeholder="Ej: Leche Descremada, Queso, Medicina..."
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className={`w-full px-4 py-4 md:py-5 bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 rounded-2xl focus:border-emerald-500 focus:outline-none transition-all placeholder-zinc-400 dark:placeholder-zinc-500 font-bold ${textSizeClass(1.0)}`}
-            required
-            autoComplete="off"
-          />
-        </div>
-      </div>
-
-      {/* Fabrication Date */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <label id="lbl-fabdate-input-tag" htmlFor="dat-fabrication-date" className={`font-extrabold text-zinc-650 dark:text-zinc-405 flex items-center gap-1.5 uppercase tracking-wide text-xs ${textSizeClass(0.85)}`}>
-            <Calendar className="w-5 h-5 text-emerald-500 shrink-0" />
-            Fecha de Elaboración
-          </label>
-          <button
-            type="button"
-            id="btn-set-today"
-            onClick={setTodayDate}
-            className="px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 text-emerald-650 dark:text-emerald-400 font-extrabold rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all cursor-pointer text-xs uppercase"
-          >
-            Usar HOY
-          </button>
-        </div>
-        <input
-          type="date"
-          id="dat-fabrication-date"
-          value={fabricationDate}
-          onChange={(e) => setFabricationDate(e.target.value)}
-          className={`w-full px-4 py-3.5 bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 rounded-2xl focus:border-emerald-500 focus:outline-none transition-all font-mono font-bold ${textSizeClass(1.0)}`}
-          required
-        />
-      </div>
-
-      {/* Duration input: Number with big buttons and segments */}
-      <div className="space-y-3">
-        <label id="lbl-duration-input-tag" className={`font-extrabold text-zinc-650 dark:text-zinc-405 block uppercase tracking-wide text-xs ${textSizeClass(0.85)}`}>
-          Duración del Producto
-        </label>
-
-        {/* Big tactile step indicators for volume control */}
-        <div className="flex items-center justify-between bg-zinc-50 dark:bg-zinc-800/60 border-2 border-zinc-200 dark:border-zinc-700 rounded-2xl p-2.5">
-          <button
-            type="button"
-            id="btn-duration-minus"
-            onClick={handleDecrement}
-            className="w-14 h-14 bg-white dark:bg-zinc-900 hover:bg-rose-50 dark:hover:bg-rose-950/20 border border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 rounded-xl flex items-center justify-center font-black shadow-sm shrink-0 cursor-pointer text-2xl active:scale-90 transition-all"
-            title="Restar 1"
-          >
-            <Minus className="w-6 h-6 stroke-[3]" />
-          </button>
-
-          <input
-            type="number"
-            id="num-duration-value"
-            min="1"
-            value={durationValue}
-            onChange={(e) => {
-              const val = e.target.value;
-              if (val === '') {
-                setDurationValue('');
-              } else {
-                const parsed = parseInt(val, 10);
-                if (!isNaN(parsed)) {
-                  setDurationValue(parsed);
-                }
-              }
-            }}
-            onBlur={handleBlur}
-            className={`w-24 md:w-32 min-w-0 text-center bg-transparent border-0 text-zinc-900 dark:text-white focus:outline-none font-bold tracking-tight focus:ring-0 select-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${textSizeClass(1.5)}`}
-          />
-
-          <button
-            type="button"
-            id="btn-duration-plus"
-            onClick={handleIncrement}
-            className="w-14 h-14 bg-white dark:bg-zinc-900 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 border border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 rounded-xl flex items-center justify-center font-black shadow-sm shrink-0 cursor-pointer text-2xl active:scale-90 transition-all"
-            title="Sumar 1"
-          >
-            <Plus className="w-6 h-6 stroke-[3]" />
-          </button>
-        </div>
-
-        {/* Duration unit segment button (días, meses, años) - No tiny dropdowns! */}
-        <div className="grid grid-cols-3 gap-2 bg-zinc-100 dark:bg-zinc-950/65 p-1.5 rounded-2xl border border-zinc-200/60 dark:border-zinc-800">
-          <button
-            type="button"
-            id="btn-unit-days"
-            onClick={() => setDurationType('days')}
-            className={`py-3.5 px-2 font-extrabold rounded-xl transition-all text-center cursor-pointer ${
-              durationType === 'days'
-                ? 'bg-emerald-500 text-zinc-950 shadow-md scale-[1.02]'
-                : 'text-zinc-655 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800'
-            } ${textSizeClass(1.0)}`}
-          >
-            Días
-          </button>
-          <button
-            type="button"
-            id="btn-unit-months"
-            onClick={() => setDurationType('months')}
-            className={`py-3.5 px-2 font-extrabold rounded-xl transition-all text-center cursor-pointer ${
-              durationType === 'months'
-                ? 'bg-emerald-500 text-zinc-950 shadow-md scale-[1.02]'
-                : 'text-zinc-655 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800'
-            } ${textSizeClass(1.0)}`}
-          >
-            Meses
-          </button>
-          <button
-            type="button"
-            id="btn-unit-years"
-            onClick={() => setDurationType('years')}
-            className={`py-3.5 px-2 font-extrabold rounded-xl transition-all text-center cursor-pointer ${
-              durationType === 'years'
-                ? 'bg-emerald-500 text-zinc-950 shadow-md scale-[1.02]'
-                : 'text-zinc-655 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800'
-            } ${textSizeClass(1.0)}`}
-          >
-            Años
-          </button>
-        </div>
-      </div>
-
-      {/* Auto Calculation Preview Block */}
-      {liveExpirationDate && (
-        <div
-          id="lbl-auto-calc-preview"
-          className={`rounded-2xl p-4 md:p-5 border transition-all ${
-            isExpired
-              ? 'bg-rose-50/70 dark:bg-rose-950/20 border-rose-350 dark:border-rose-900/40 text-rose-900 dark:text-rose-200'
-              : 'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-350 dark:border-emerald-900/40 text-emerald-900 dark:text-emerald-200'
-          }`}
-        >
-          <div className="flex items-center gap-2 mb-2">
-            {isExpired ? (
-              <AlertTriangle className="w-6 h-6 text-rose-600 dark:text-rose-400 shrink-0 animate-bounce" />
-            ) : (
-              <CheckCircle2 className="w-6 h-6 text-emerald-600 dark:text-emerald-400 shrink-0" />
-            )}
-            <span id="lbl-preview-status-badge" className={`font-black tracking-widest uppercase ${textSizeClass(1.15)}`}>
-              {isExpired ? 'VENCIDO' : 'VIGENTE'}
-            </span>
-          </div>
-
-          <div className="space-y-1 mt-1 border-t border-zinc-205/50 dark:border-zinc-850/55 pt-3">
-            <p id="lbl-preview-expdate" className={`font-bold uppercase tracking-wider text-xs text-zinc-500 dark:text-zinc-400 ${textSizeClass(0.85)}`}>
-              Fecha de Vencimiento:
-            </p>
-            <p id="lbl-preview-expdate-value" className={`font-extrabold uppercase tracking-tight ${textSizeClass(1.35)}`}>
-              {formatFriendlyDate(liveExpirationDate)}
-            </p>
-            <p id="lbl-preview-countdown" className={`font-black mt-1 font-mono tracking-tight ${textSizeClass(1.1)}`}>
-              {isExpired ? (
-                <span className="text-rose-600 dark:text-rose-400">❌ Venció hace {Math.abs(daysDifference)} {Math.abs(daysDifference) === 1 ? 'día' : 'días'}</span>
-              ) : isToday ? (
-                <span className="text-amber-600 dark:text-amber-400">⚠️ ¡VENCE HOY MISMO!</span>
-              ) : (
-                <span className="text-emerald-600 dark:text-emerald-400">✅ Faltan {daysDifference} {daysDifference === 1 ? 'día' : 'días'} restantes</span>
-              )}
-            </p>
-          </div>
-        </div>
+      {error && (
+        <p className="mb-4 text-xs font-semibold text-rose-800 bg-rose-50 border border-rose-100 rounded-xl p-3 text-left">
+          {error}
+        </p>
       )}
 
-      {/* Save Button (Enorme) */}
-      <button
-        type="submit"
-        id="btn-save-product"
-        disabled={!name.trim()}
-        className={`w-full py-4.5 md:py-5 px-6 rounded-2xl font-black text-center flex items-center justify-center gap-2.5 transition-all shadow-md active:scale-[0.98] ${
-          name.trim()
-            ? 'bg-emerald-500 text-zinc-950 cursor-pointer hover:bg-emerald-400 shadow-lg shadow-emerald-500/10'
-            : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600 cursor-not-allowed border border-zinc-200 dark:border-zinc-800/60'
-        } ${textSizeClass(1.15)}`}
-      >
-        <Save className="w-6 h-6 shrink-0" />
-        <span className="uppercase tracking-wider">Guardar en Historial</span>
-      </button>
-    </form>
+      <form onSubmit={handleSubmit} className="space-y-4 text-left">
+        <div>
+          <label className="block text-[10px] font-bold text-slate-550 uppercase tracking-wide mb-1.5">Código de Barras</label>
+          <div className="relative">
+            <Barcode className="absolute left-3.5 top-3.5 text-slate-400" size={15} />
+            <input
+              type="text"
+              required
+              disabled={!!editingProduct} // Cannot change barcode on edit
+              placeholder="Escribe o escanea el código"
+              value={barcode}
+              onChange={(e) => setBarcode(e.target.value)}
+              className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-850 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 font-mono"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-[10px] font-bold text-slate-550 uppercase tracking-wide mb-1.5">Nombre del Producto</label>
+          <div className="relative">
+            <Tag className="absolute left-3.5 top-3.5 text-slate-400" size={15} />
+            <input
+              type="text"
+              required
+              placeholder="Ej: Sabritas Crujientes 45g"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-850 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-[10px] font-bold text-slate-550 uppercase tracking-wide mb-1.5">Precio ($)</label>
+            <div className="relative">
+              <DollarSign className="absolute left-3.5 top-3.5 text-slate-400" size={15} />
+              <input
+                type="number"
+                step="0.01"
+                required
+                placeholder="0.00"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-850 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-bold text-slate-550 uppercase tracking-wide mb-1.5">Inventario / Stock</label>
+            <div className="relative">
+              <Package className="absolute left-3.5 top-3.5 text-slate-400" size={15} />
+              <input
+                type="number"
+                required
+                placeholder="10"
+                value={stock}
+                onChange={(e) => setStock(e.target.value)}
+                className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-850 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-[10px] font-bold text-slate-550 uppercase tracking-wide mb-1.5">Categoría</label>
+          <div className="relative">
+            <Folder className="absolute left-3.5 top-3.5 text-slate-400" size={15} />
+            <input
+              type="text"
+              placeholder="Ej: Snacks, Bebidas, Lácteos"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-850 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-2.5 pt-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={isSubmitting}
+            className="flex-1 bg-white border border-slate-200 text-slate-600 hover:text-slate-800 py-3 rounded-xl hover:bg-slate-50 transition-colors text-xs font-semibold cursor-pointer"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            id="btn-save-product-modal"
+            disabled={isSubmitting}
+            className="flex-1 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white py-3 rounded-xl transition-colors font-semibold text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/10 cursor-pointer"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="animate-spin" size={14} />
+                <span>Guardando...</span>
+              </>
+            ) : editingProduct ? (
+              <>
+                <Save size={14} />
+                <span>Actualizar</span>
+              </>
+            ) : (
+              <>
+                <Plus size={14} />
+                <span>Agregar a Hoja</span>
+              </>
+            )}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
