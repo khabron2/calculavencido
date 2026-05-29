@@ -1,6 +1,6 @@
 {
-  "name": "Barcode Sheet Scanner",
-  "description": "Scan barcodes using your camera, look up products in Google Sheets, and generate professional PDF reports.",
+  "name": "Control de Vencimientos",
+  "description": "Aplicación ágil e intuitiva para calcular y controlar fechas de vencimiento de productos, con alta legibilidad, modo oscuro, linterna y registro de historial.",
   "requestFramePermissions": ["camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

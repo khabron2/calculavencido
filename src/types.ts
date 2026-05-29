@@ -1,30 +1,18 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
+export type DurationType = 'days' | 'months' | 'years';
 
 export interface Product {
-  barcode: string;
-  name: string;
-  price: number;
-  category: string;
-  stock: number;
-  rowNumber?: number; // Keep track of the Excel/Sheet row index for potential edits
-}
-
-export interface ScanItem {
-  product: Product;
-  quantity: number;
-  timestamp: string;
-}
-
-export interface SheetConfig {
-  spreadsheetId: string;
-  sheetName: string;
-}
-
-export interface GoogleSheetFile {
   id: string;
   name: string;
-  mimeType: string;
+  fabricationDate: string; // YYYY-MM-DD
+  durationValue: number;
+  durationType: DurationType;
+  expirationDate: string; // YYYY-MM-DD
+  createdAt: number; // timestamp
+}
+
+export type TextSizePref = 'normal' | 'large' | 'huge';
+
+export interface AppSettings {
+  isDarkMode: boolean;
+  textSize: TextSizePref;
 }

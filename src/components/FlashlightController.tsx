@@ -113,9 +113,6 @@ export default function FlashlightController({ textSizeClass }: FlashlightProps)
             <h3 id="lbl-linterna-title" className={`font-bold text-zinc-900 dark:text-zinc-100 leading-tight ${textSizeClass(1.1)}`}>
               Linterna de Apoyo
             </h3>
-            <p id="lbl-linterna-desc" className={`text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed ${textSizeClass(0.85)}`}>
-              Úsala para ver fechas de vencimiento pequeñas en rincones oscuros de la alacena.
-            </p>
           </div>
         </div>
 
